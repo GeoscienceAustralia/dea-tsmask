@@ -1,0 +1,111 @@
+products:
+    s2_ard:
+        recipe: &s2_ard_recipe
+            collate:
+                - product: s2a_ard_granule
+                  resampling: average
+                  measurements: [nbart_blue, nbart_green, nbart_red, nbart_nir_2, nbart_swir_2, nbart_swir_3]
+                - product: s2b_ard_granule
+                  resampling: average
+                  measurements: [nbart_blue, nbart_green, nbart_red, nbart_nir_2, nbart_swir_2, nbart_swir_3]
+
+    s2_ard_scaled:
+        recipe: &s2_ard_scaled_recipe
+            transform: expressions
+            output:
+                blue:
+                    formula: nbart_blue / 10000.
+                    dtype: float32
+                green:
+                    formula: nbart_green / 10000.
+                    dtype: float32
+                red:
+                    formula: nbart_red / 10000.
+                    dtype: float32
+                nir_2:
+                    formula: nbart_nir_2 / 10000.
+                    dtype: float32
+                swir_2:
+                    formula: nbart_swir_2 / 10000.
+                    dtype: float32
+                swir_3:
+                    formula: nbart_swir_3 / 10000.
+                    dtype: float32
+            input: *s2_ard_recipe
+
+    s2_indices:
+        recipe: &s2_indices_recipe
+            transform: expressions
+            output:
+                avg:
+                    formula: (blue + green + red + nir_2 + swir_2 + swir_3) / 6
+                mndwi:
+                    formula: (green - swir_2) / (green + swir_2)
+                msavi:
+                    formula: ((2 * nir_2 + 1) - ((2 * nir_2 + 1) * (2 * nir_2 + 1) - 8 * (nir_2 - red)) ** 0.5) / 2
+            input: *s2_ard_scaled_recipe
+
+    s2_tsmask:
+        product_definition:
+            name: s2_tsmask
+            description: |
+                Time series cloud and cloud shadow detection for Sentinel-2A and Sentinel-2B surface reflectance data.
+
+                TSmask classifies a pixel as one of the following four categories: clear, no observation, shadow and cloud.
+            metadata:
+                format:
+                    name: GeoTIFF
+                instrument:
+                    name: MSI
+                platform:
+                    code: SENTINEL_2A,SENTINEL_2B
+                product_type: S2_MSI_TSmask
+            metadata_type: eo
+
+        recipe:
+            transform: tsmask
+            input: *s2_indices_recipe
+
+        about:
+            title: Sentinel-2 cloud and cloud shadow mask
+            description: |
+                Time series cloud and cloud shadow detection for Sentinel-2A and Sentinel-2B surface reflectance data.
+
+                TSmask classifies a pixel as one of the following four categories: no observation, clear, cloud, and cloud shadow.
+            institution: Commonwealth of Australia (Geoscience Australia)
+            keywords_vocabulary: GCMD
+            keywords: AU/GA,ESA,SURFACE REFLECTANCE,MSI,SENTINEL-2,TIME SERIES,EARTH SCIENCE
+            platform: Sentinel 2A/2B
+            instrument: MSI
+            publisher_email: earth.observation@ga.gov.au
+            publisher_name: Director of Operations, National Earth and Marine Observations, Geoscience Australia
+            publisher_url: http://www.ga.gov.au
+            license: CC BY Attribution 4.0 International License
+            product_version: '1'
+            product_suite: Temporal cloud and cloud shadow mask
+            source: Time series cloud and cloud shadow detection
+            acknowledgment: >-
+              Sentinel-2 data is provided by the European Space Agency (ESA) through download from Copernicus
+              Australasia Regional Data Hub.
+            references: |
+              - Hagolle, O., Huc, M., Pascual, D. V., & Dedieu, G. (2010). A multi-temporal method for cloud detection,
+                applied to FORMOSAT-2, VENµS, LANDSAT and SENTINEL-2 images. Remote Sensing of Environment, 114(8), 1747-1755.
+                doi: https://doi.org/10.1016/j.rse.2010.03.002
+              - Qi, J., Chehbouni, A., Huete, A. R., Kerr, Y. H., & Sorooshian, S. (1994). A modified soil adjusted vegetation
+                index. Remote Sensing of Environment, 48(2), 119-126.
+                doi: https://doi.org/10.1016/0034-4257(94)90134-1
+              - Qiu, S., Zhu, Z., & He, B. (2019). Fmask 4.0: Improved cloud and cloud shadow detection in Landsats 4-8 and
+                Sentinel-2 imagery. Remote Sensing of Environment, 231, 111205.
+                doi: https://doi.org/10.1016/j.rse.2019.05.024
+              - Xu, H. (2006). Modification of normalised difference water index (NDWI) to enhance open water features in
+                remotely sensed imagery. International Journal of Remote Sensing, 27(14), 3025-3033.
+                doi: 10.1080/01431160600589179
+              - Zhu, Z., Wang, S., & Woodcock, C. E. (2015). Improvement and expansion of the Fmask algorithm: cloud, cloud
+                shadow, and snow detection for Landsats 4-7, 8, and Sentinel 2 images. Remote Sensing of Environment,
+                159(Supplement C), 269-277.
+                doi: https://doi.org/10.1016/j.rse.2014.12.014
+              - Zhu, Z., & Woodcock, C. E. (2012). Object-based cloud and cloud shadow detection in Landsat imagery.
+                Remote Sensing of Environment, 118, 83-94.
+                doi: https://doi.org/10.1016/j.rse.2011.10.028
+            coverage_content_type: modelResult
+            cdm_data_type: Grid
