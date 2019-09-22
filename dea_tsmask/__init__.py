@@ -1,5 +1,5 @@
-from .impl import tsmask_temporal as tsmask_temporal_prim
-from .impl import spatial_noise_filter as spatial_noise_filter_prim
+from dea_tsmask.impl import tsmask_temporal as tsmask_temporal_prim
+from dea_tsmask.impl import spatial_noise_filter as spatial_noise_filter_prim
 
 
 DEFAULT_THRESHOLDS = dict(brightness=0.45,

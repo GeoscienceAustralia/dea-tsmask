@@ -61,10 +61,10 @@ def custom_native_geobox(ds, measurements=None):
 
 class TSMask(Transformation):
     def compute(self, data):
-        result = xarray.DataArray(data=xarray.apply_ufunc(tsmask_temporal, data.avg, data.mndwi, data.msavi,
-                                                          dask='parallelized', output_dtypes=['uint8']),
-                                  coords=data.coords,
-                                  attrs=dict(nodata=0, units='1'))
+        chunks = dict(time=-1)
+        result = xarray.apply_ufunc(tsmask_temporal,
+                                    data.avg.chunk(chunks), data.mndwi.chunk(chunks), data.msavi.chunk(chunks),
+                                    dask='parallelized', output_dtypes=['uint8']).assign_attrs(nodata=0, units='1')
         return result.to_dataset(name='classification').assign_attrs(**data.attrs)
 
     def measurements(self, input_measurements):
@@ -221,6 +221,16 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
         logging.info('found existing zarr file, removing')
         shutil.rmtree(zarr_file)
 
+    with mock.patch('datacube.virtual.impl.native_geobox', side_effect=custom_native_geobox):
+        data = product.fetch(box, dask_chunks=dask_chunks)
+
+    # TODO netcdfy data
+    # zarr does not like these
+    attrs = dict(**data.attrs)
+    time_attrs = dict(**data.coords['time'].attrs)
+    data.coords['time'].attrs = {}
+    data.attrs = {}
+
     with dask.config.set({'distributed.admin.log-format': '%(name)s - %(levelname)s - %(asctime)s - %(message)s',
                           'distributed.client.heartbeat': '20s',
                           'distributed.comm.timeouts.connect': '60s',
@@ -233,15 +243,6 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
         with Client(n_workers=workers, processes=True, local_directory=tmpdir, memory_limit=memory_limit, threads_per_worker=1) as client:
             client.run(init_logging)
 
-            with mock.patch('datacube.virtual.impl.native_geobox', side_effect=custom_native_geobox):
-                data = product.fetch(box, dask_chunks=dask_chunks)
-                attrs = dict(**data.attrs)
-                time_attrs = dict(**data.coords['time'].attrs)
-
-            # TODO netcdfy data
-            # zarr does not like these
-            data.coords['time'].attrs = {}
-            data.attrs = {}
             data.to_zarr(zarr_file)
 
     logging.info('finished processing tsmask')
