@@ -78,6 +78,9 @@ def same_grid(input_bag):
         return ((geobox.width, geobox.height), tuple(geobox.affine))
 
     datasets = list(input_bag.contained_datasets())
+    if not datasets:
+        raise ValueError('no data')
+
     counter = Counter([tuplify(custom_native_geobox(ds)) for ds in datasets])
     common = counter.most_common(1)[0][0]
 
@@ -92,7 +95,11 @@ def search(dc, region_code, product, mode):
         query = dict(region_code=region_code, time=('2018-06', '2018-07'))
     else:
         query = dict(region_code=region_code)
-    bag = same_grid(product.query(dc, **query))
+
+    try:
+        bag = same_grid(product.query(dc, **query))
+    except ValueError:
+        raise ValueError('no data for {}'.format(region_code))
 
     if mode == 'test':
         return bag
@@ -168,7 +175,7 @@ def write_timeslice(zarr_file, index, dtype, nodata, geobox, about, out_file):
 @click.option('--outdir', type=click.Path(dir_okay=True, file_okay=False), required=True)
 @click.option('--workers', type=int)
 @click.option('--tmpdir', type=click.Path(dir_okay=True, file_okay=False))
-@click.option('--cleanup', type=bool)
+@click.option('--cleanup', type=bool, default=True)
 def main(region_code, mode, outdir, workers, tmpdir, cleanup):
     if workers is None:
         if mode == 'initial':
@@ -259,6 +266,8 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
 
         with Client(n_workers=workers, processes=True, local_directory=tmpdir, memory_limit=memory_limit, threads_per_worker=1) as client:
             client.run(init_logging)
+
+            client.scatter(data, broadcast=True)
 
             data.to_zarr(zarr_file)
 
