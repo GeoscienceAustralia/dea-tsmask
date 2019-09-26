@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import logging
+import uuid
 
 import dask
 from dask.distributed import Client
@@ -149,14 +150,15 @@ def write_timeslice(zarr_file, index, dtype, nodata, geobox, about, out_file):
         'count': 1
     }
 
-    with rasterio.open(out_file, mode='w', **profile) as out:
-        # TODO atomic write
+    tmp_out_file = str(out_file) + '-tmp-' + str(uuid.uuid1())
+    with rasterio.open(tmp_out_file, mode='w', **profile) as out:
         src = zarr.open(zarr_file)
         mask = src['classification'][index, ...]
         less_noisy_mask = spatial_noise_filter(spatial_noise_filter(numpy.expand_dims(mask, axis=0)))
         out.write(less_noisy_mask[0], 1)
         out.update_tags(**about)
 
+    shutil.move(tmp_out_file, out_file)
     logging.info('wrote %s', out_file)
 
 
@@ -191,6 +193,14 @@ def valid_region(dataset_box, index):
     item = dataset_box.box[index].item()
     datasets = item['collate'][1]
     return unary_union(ds.extent for ds in datasets)
+
+
+def done(out_file):
+    return out_file.exists() and out_file.with_suffix('.yaml').exists()
+
+
+def output_file(folder, epoch):
+    return folder / ('s2_tsmask_' + str(epoch).replace(':', '').replace('-', '')[:15] + '.tif')
 
 
 def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, memory_limit, cleanup):
@@ -231,6 +241,13 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     data.coords['time'].attrs = {}
     data.attrs = {}
 
+    folder = Path(outdir) / region_code
+    folder.mkdir(exist_ok=True, parents=True)
+
+    if all(done(output_file(folder, epoch)) for index, epoch in enumerate(data.coords['time'].values)):
+        logging.info('all targets already completed!')
+        return
+
     with dask.config.set({'distributed.admin.log-format': '%(name)s - %(levelname)s - %(asctime)s - %(message)s',
                           'distributed.client.heartbeat': '20s',
                           'distributed.comm.timeouts.connect': '60s',
@@ -249,15 +266,12 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     data.attrs = attrs
     data.coords['time'].attrs = time_attrs
 
-    folder = Path(outdir) / region_code
-    folder.mkdir(exist_ok=True, parents=True)
-
     futures = []
     # this is cheap, let the local cluster figure it out
     with Client(local_directory=tmpdir) as client:
         for index, epoch in enumerate(data.coords['time'].values):
-            out_file = folder / ('s2_tsmask_' + str(epoch).replace(':', '').replace('-', '')[:15] + '.tif')
-            if out_file.exists() and out_file.with_suffix('.yaml').exists():
+            out_file = output_file(folder, epoch)
+            if done(out_file):
                 logging.info("not writing %s: it's already there", out_file)
             else:
                 dataset = make_dataset(product=datacube_product,
@@ -282,6 +296,10 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     logging.info('finished packaging')
     if Path(zarr_file).exists() and cleanup:
         shutil.rmtree(zarr_file)
+
+    if all(done(output_file(folder, epoch)) for index, epoch in enumerate(data.coords['time'].values)):
+        with open(str(Path(outdir) / (region_code + '.done')), 'w') as fl:
+            pass
 
 
 if __name__ == '__main__':
