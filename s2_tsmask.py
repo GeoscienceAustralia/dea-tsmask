@@ -52,7 +52,7 @@ def bag_filter(dataset_bag, predicate):
     return VirtualDatasetBag(worker(dataset_bag.bag), dataset_bag.geopolygon, dataset_bag.product_definitions)
 
 
-def custom_native_geobox(ds, measurements=None):
+def custom_native_geobox(ds, measurements=None, basis=None):
     metadata = ds.metadata_doc['image']['bands']['nbart_swir_3']['info']
     geotransform = metadata['geotransform']
     crs = CRS(ds.metadata_doc['grid_spatial']['projection']['spatial_reference'])
@@ -92,7 +92,7 @@ def same_grid(input_bag):
 
 def search(dc, region_code, product, mode):
     if mode == 'test':
-        query = dict(region_code=region_code, time=('2018-06', '2018-07'))
+        query = dict(region_code=region_code, time=('2018-04', '2018-07'))
     else:
         query = dict(region_code=region_code)
 
