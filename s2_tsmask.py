@@ -241,12 +241,16 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     with mock.patch('datacube.virtual.impl.native_geobox', side_effect=custom_native_geobox):
         data = product.fetch(box, dask_chunks=dask_chunks)
 
+    logging.info('processing %r finished', dataset_bag)
+
     # TODO netcdfy data
     # zarr does not like these
     attrs = dict(**data.attrs)
     time_attrs = dict(**data.coords['time'].attrs)
+    data_attrs = dict(**data.classification.attrs)
     data.coords['time'].attrs = {}
     data.attrs = {}
+    data.classification.attrs = {}
 
     folder = Path(outdir) / region_code
     folder.mkdir(exist_ok=True, parents=True)
@@ -274,6 +278,7 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     logging.info('finished processing tsmask')
     data.attrs = attrs
     data.coords['time'].attrs = time_attrs
+    data.classification.attrs = data_attrs
 
     futures = []
     # this is cheap, let the local cluster figure it out
