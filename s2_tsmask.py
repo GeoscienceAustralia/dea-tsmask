@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import logging
 import uuid
+from multiprocessing import Pool
 
 import dask
 from dask.distributed import Client
@@ -140,7 +141,22 @@ def load_catalog():
                              name_resolver=resolver)
 
 
-def write_timeslice(zarr_file, index, dtype, nodata, geobox, about, out_file):
+def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_file, product, lineage, box, region_code):
+    if done(out_file):
+        logging.info("not writing %s: it's already there", out_file)
+        return
+
+    dataset = make_dataset(product=product,
+                           sources=lineage,
+                           extent=geobox.extent,
+                           valid_data=valid_region(box, index),
+                           center_time=epoch.item(),
+                           band_uris={'classification': {'layer': 1,
+                                                         'path': out_file.as_uri()}})
+    dataset.metadata_doc['provider'] = {'reference_code': region_code}
+    with open(out_file.with_suffix('.yaml'), 'w') as fl:
+        fl.write(yaml.dump(dataset.metadata_doc, Dumper=SafeDumper))
+
     profile = {
         'compress': 'deflate',
         'driver': 'GTiff',
@@ -179,13 +195,13 @@ def write_timeslice(zarr_file, index, dtype, nodata, geobox, about, out_file):
 def main(region_code, mode, outdir, workers, tmpdir, cleanup):
     if workers is None:
         if mode == 'initial':
-            workers = 4
+            workers = 28
             dask_chunks = dict(time=-1, x=400, y=400)
-            memory_limit = '50GB'
+            memory_limit = '40GB'
         else:
-            workers = 16
-            dask_chunks = dict(time=-1, x=500, y=500)
-            memory_limit = '16GB'
+            workers = 28
+            dask_chunks = dict(time=-1, x=400, y=400)
+            memory_limit = '10GB'
 
     if tmpdir is None:
         if 'PBS_JOBFS' in os.environ:
@@ -282,30 +298,12 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
 
     futures = []
     # this is cheap, let the local cluster figure it out
-    with Client(local_directory=tmpdir) as client:
-        for index, epoch in enumerate(data.coords['time'].values):
-            out_file = output_file(folder, epoch)
-            if done(out_file):
-                logging.info("not writing %s: it's already there", out_file)
-            else:
-                dataset = make_dataset(product=datacube_product,
-                                       sources=lineage,
-                                       extent=data.geobox.extent,
-                                       valid_data=valid_region(box, index),
-                                       center_time=epoch.item(),
-                                       band_uris={'classification': {'layer': 1,
-                                                                     'path': out_file.as_uri()}})
-                dataset.metadata_doc['provider'] = {'reference_code': region_code}
-                with open(out_file.with_suffix('.yaml'), 'w') as fl:
-                    fl.write(yaml.dump(dataset.metadata_doc, Dumper=SafeDumper))
-
-                futures.append(client.submit(write_timeslice, zarr_file, index,
-                                             data['classification'].dtype,
-                                             data['classification'].nodata,
-                                             data.geobox,
-                                             description['about'],
-                                             out_file))
-        client.gather(futures)
+    with Pool(initializer=init_logging) as pool:
+        pool.starmap(write_timeslice, [(zarr_file, index, epoch,
+                                        data['classification'].dtype, data['classification'].nodata, data.geobox,
+                                        description['about'], output_file(folder, epoch),
+                                        datacube_product, lineage, box, region_code)
+                                       for index, epoch in enumerate(data.coords['time'].values)])
 
     logging.info('finished packaging')
     if Path(zarr_file).exists() and cleanup:
