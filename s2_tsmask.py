@@ -195,9 +195,9 @@ def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_f
 def main(region_code, mode, outdir, workers, tmpdir, cleanup):
     if workers is None:
         if mode == 'initial':
-            workers = 28
+            workers = 5
             dask_chunks = dict(time=-1, x=400, y=400)
-            memory_limit = '40GB'
+            memory_limit = '50GB'
         else:
             workers = 28
             dask_chunks = dict(time=-1, x=400, y=400)
