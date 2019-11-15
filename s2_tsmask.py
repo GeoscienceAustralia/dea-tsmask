@@ -88,7 +88,10 @@ def same_grid(input_bag):
     def predicate(ds):
         return tuplify(custom_native_geobox(ds)) == common
 
-    return bag_filter(input_bag, predicate)
+    def has_location(ds):
+        return len(ds.uris) > 0
+
+    return bag_filter(bag_filter(input_bag, predicate), has_location)
 
 
 def search(dc, region_code, product, mode):
