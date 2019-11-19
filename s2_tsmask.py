@@ -157,6 +157,7 @@ def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_f
                            band_uris={'classification': {'layer': 1,
                                                          'path': out_file.as_uri()}})
     dataset.metadata_doc['provider'] = {'reference_code': region_code}
+    dataset.metadata_doc['algorithm_information'] = {'algorithm_version': '0.1.0', 'algorithm_name': 'dea_tsmask'}
     with open(out_file.with_suffix('.yaml'), 'w') as fl:
         fl.write(yaml.dump(dataset.metadata_doc, Dumper=SafeDumper))
 
