@@ -150,7 +150,7 @@ def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_f
         return
 
     dataset = make_dataset(product=product,
-                           sources=lineage,
+                           sources=[],
                            extent=geobox.extent,
                            valid_data=valid_region(box, index),
                            center_time=epoch.item(),
@@ -158,6 +158,8 @@ def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_f
                                                          'path': out_file.as_uri()}})
     dataset.metadata_doc['provider'] = {'reference_code': region_code}
     dataset.metadata_doc['algorithm_information'] = {'algorithm_version': '0.1.0', 'algorithm_name': 'dea_tsmask'}
+    del dataset.metadata_doc['lineage']
+    dataset.metadata_doc['input_datasets'] = lineage
     with open(out_file.with_suffix('.yaml'), 'w') as fl:
         fl.write(yaml.dump(dataset.metadata_doc, Dumper=SafeDumper))
 
@@ -243,7 +245,7 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     dataset_bag = search(dc, region_code, product, mode)
 
     measurements = product.output_measurements(dataset_bag.product_definitions)
-    lineage = list(dataset_bag.contained_datasets())
+    lineage = [str(ds.id) for ds in dataset_bag.contained_datasets()]
 
     datacube_product = create_datacube_product(dc,
                                                description['product_definition'],
