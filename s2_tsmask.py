@@ -155,7 +155,7 @@ def write_timeslice(zarr_file, index, epoch, dtype, nodata, geobox, about, out_f
                            valid_data=valid_region(box, index),
                            center_time=epoch.item(),
                            band_uris={'classification': {'layer': 1,
-                                                         'path': out_file.as_uri()}})
+                                                         'path': out_file.name}})
     dataset.metadata_doc['provider'] = {'reference_code': region_code}
     dataset.metadata_doc['algorithm_information'] = {'algorithm_version': '0.1.0', 'algorithm_name': 'dea_tsmask'}
     del dataset.metadata_doc['lineage']
