@@ -277,7 +277,12 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     folder = Path(outdir) / region_code
     folder.mkdir(exist_ok=True, parents=True)
 
-    if all(done(output_file(folder, epoch)) for index, epoch in enumerate(data.coords['time'].values)):
+
+    not_done = [str(output_file(folder, epoch).with_suffix('.yaml'))
+                for index, epoch in enumerate(data.coords['time'].values)
+                if not done(output_file(folder, epoch))]
+
+    if not_done == []:
         logging.info('all targets already completed!')
         return
 
@@ -318,6 +323,9 @@ def generate_s2_tsmask(region_code, mode, outdir, workers, tmpdir, dask_chunks, 
     if all(done(output_file(folder, epoch)) for index, epoch in enumerate(data.coords['time'].values)):
         with open(str(Path(outdir) / (region_code + '.done')), 'w') as fl:
             pass
+
+    for ds in not_done:
+        print(ds)
 
 
 if __name__ == '__main__':
