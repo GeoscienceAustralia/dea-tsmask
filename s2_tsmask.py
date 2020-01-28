@@ -205,9 +205,9 @@ def main(region_code, mode, outdir, workers, tmpdir, cleanup):
             dask_chunks = dict(time=-1, x=400, y=400)
             memory_limit = '50GB'
         else:
-            workers = 28
-            dask_chunks = dict(time=-1, x=400, y=400)
-            memory_limit = '10GB'
+            workers = 48
+            dask_chunks = dict(time=-1, x=200, y=200)
+            memory_limit = '4GB'
 
     if tmpdir is None:
         if 'PBS_JOBFS' in os.environ:
